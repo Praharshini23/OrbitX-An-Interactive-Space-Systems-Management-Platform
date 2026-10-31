@@ -1,4 +1,4 @@
-# 🛰️ BSERC Def-Space // Interactive Satellite & Mission Control Suite
+# 🛰️ OrbitX-An-Interactive-Space-Systems-Management-Platform
 
 A suite of responsive, component-based interactive web applications developed for the **BSERC Def-Space Internship Programme**. This project translates complex aerospace systems, orbital mechanics, and launch vehicle trade studies into functional, self-contained client-side web tools.
 
