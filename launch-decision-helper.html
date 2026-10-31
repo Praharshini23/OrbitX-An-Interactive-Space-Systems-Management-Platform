@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Launch Vehicle & Payload Decision Helper | BSERC Def-Space</title>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #111827;
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border-color: #1f2937;
+            --success-color: #10b981;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); padding: 20px; line-height: 1.6; }
+        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px; }
+        header h1 { font-size: 1.5rem; color: var(--accent-color); }
+        .badge { background: rgba(59, 130, 246, 0.1); color: var(--accent-color); padding: 4px 10px; border-radius: 4px; font-size: 0.85rem; border: 1px solid rgba(59, 130, 246, 0.2); }
+        
+        .grid-layout { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+        @media (max-width: 900px) { .grid-layout { grid-template-columns: 1fr; } }
+
+        .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .card h2 { font-size: 1.1rem; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; color: var(--text-main); }
+        
+        .control-group { margin-bottom: 15px; }
+        .control-group label { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 5px; color: var(--text-muted); }
+        .control-group label span { color: var(--text-main); font-weight: bold; }
+        input[type="range"] { width: 100%; accent-color: var(--accent-color); cursor: pointer; }
+
+        .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .checkbox-grid label { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; }
+        .checkbox-grid input { accent-color: var(--accent-color); transform: scale(1.1); cursor: pointer; }
+
+        .select-box { width: 100%; padding: 10px; background: #1f2937; color: white; border: 1px solid var(--border-color); border-radius: 4px; font-size: 1rem; margin-top: 5px; outline: none; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { background: rgba(255,255,255,0.03); color: var(--text-muted); font-weight: 600; }
+        tr:hover { background: rgba(59, 130, 246, 0.04); }
+
+        .btn-export { background: var(--success-color); color: white; border: none; padding: 10px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 15px; transition: opacity 0.2s; }
+        .btn-export:hover { opacity: 0.9; }
+
+        #exportModal { display: none; margin-top: 15px; background: rgba(16, 185, 129, 0.1); border: 1px solid var(--success-color); padding: 15px; border-radius: 6px; font-size: 0.9rem; }
+        #exportModal h3 { color: var(--success-color); margin-bottom: 5px; font-size: 1rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>BSERC Def-Space // Launch Vehicle Trade Study</h1>
+        <div class="badge">Decision Support Matrix</div>
+    </header>
+
+    <div class="grid-layout">
+        <!-- Controls Panel -->
+        <div class="card">
+            <h2>1. Mission Requirements</h2>
+            
+            <!-- Control 1: Payload Mass -->
+            <div class="control-group">
+                <label>Payload Mass: <span id="massVal">1,200 kg</span></label>
+                <input type="range" id="massSlider" min="200" max="6000" step="100" value="1200" oninput="filterRockets()">
+            </div>
+
+            <!-- Control 2: Target Altitude -->
+            <div class="control-group">
+                <label>Target Altitude: <span id="altVal">600 km (LEO)</span></label>
+                <input type="range" id="altSlider" min="300" max="36000" step="100" value="600" oninput="filterRockets()">
+            </div>
+
+            <!-- Control 3: Budget Cap -->
+            <div class="control-group">
+                <label>Max Budget Cap: <span id="budgetVal">$65 M</span></label>
+                <input type="range" id="budgetSlider" min="15" max="150" step="5" value="65" oninput="filterRockets()">
+            </div>
+
+            <!-- Control 4: Provider Checkboxes -->
+            <div class="control-group" style="margin-top: 15px;">
+                <label style="margin-bottom: 8px;">Filter by Launch Provider</label>
+                <div class="checkbox-grid">
+                    <label><input type="checkbox" id="prov_isro" checked onchange="filterRockets()"> ISRO</label>
+                    <label><input type="checkbox" id="prov_spacex" checked onchange="filterRockets()"> SpaceX</label>
+                    <label><input type="checkbox" id="prov_esa" checked onchange="filterRockets()"> ESA</label>
+                    <label><input type="checkbox" id="prov_ula" checked onchange="filterRockets()"> ULA</label>
+                </div>
+            </div>
+
+            <!-- Control 5: Launch Site Dropdown -->
+            <div class="control-group" style="margin-top: 15px;">
+                <label>Primary Launch Complex</label>
+                <select class="select-box" id="launchSite" onchange="filterRockets()">
+                    <option value="SDSC SHAR, Sriharikota (India)">SDSC SHAR, Sriharikota (India)</option>
+                    <option value="Kennedy Space Center, Florida (USA)">Kennedy Space Center, Florida (USA)</option>
+                    <option value="Kourou Space Centre (French Guiana)">Kourou Space Centre (French Guiana)</option>
+                    <option value="Vandenberg SFB, California (USA)">Vandenberg SFB, California (USA)</option>
+                </select>
+            </div>
+
+            <button class="btn-export" onclick="exportConfig()">Generate Mission Trade Export Card</button>
+            <div id="exportModal">
+                <h3>Configuration Locked & Exported!</h3>
+                <p id="exportText">Top Recommendation: LVM3 (ISRO). Payload margin: +2,800 kg. Cost efficiency: Optimum.</p>
+            </div>
+        </div>
+
+        <!-- Comparison Table Panel -->
+        <div class="card">
+            <h2>2. Launch Vehicle Options & Comparative Ranking</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Vehicle</th>
+                        <th>Provider</th>
+                        <th>Max LEO/GTO Cap</th>
+                        <th>Est. Cost</th>
+                        <th>Success Rate</th>
+                        <th>Suitability</th>
+                    </tr>
+                </thead>
+                <tbody id="rocketTableBody">
+                    <!-- Populated dynamically via JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const rockets = [
+            { name: "LVM3 (Mark-III)", provider: "ISRO", cap: 4000, cost: 45, success: "98.5%", site: "SDSC SHAR, Sriharikota (India)" },
+            { name: "PSLV-XL", provider: "ISRO", cap: 1750, cost: 28, success: "97.2%", site: "SDSC SHAR, Sriharikota (India)" },
+            { name: "Falcon 9 Block 5", provider: "SpaceX", cap: 17400, cost: 62, success: "99.1%", site: "Kennedy Space Center, Florida (USA)" },
+            { name: "Ariane 62", provider: "ESA", cap: 10350, cost: 75, success: "100%", site: "Kourou Space Centre (French Guiana)" },
+            { name: "Vulcan Centaur", provider: "ULA", cap: 17200, cost: 95, success: "100%", site: "Kennedy Space Center, Florida (USA)" },
+            { name: "SSLV", provider: "ISRO", cap: 500, cost: 18, success: "95.0%", site: "SDSC SHAR, Sriharikota (India)" }
+        ];
+
+        let bestMatch = rockets[0];
+
+        function filterRockets() {
+            let mass = parseInt(document.getElementById('massSlider').value);
+            let alt = parseInt(document.getElementById('altSlider').value);
+            let budget = parseInt(document.getElementById('budgetSlider').value);
+
+            document.getElementById('massVal').innerText = mass.toLocaleString() + " kg";
+            document.getElementById('altVal').innerText = alt >= 2000 ? "36,000 km (GTO)" : alt + " km (LEO)";
+            document.getElementById('budgetVal').innerText = "$" + budget + " M";
+
+            let pISRO = document.getElementById('prov_isro').checked;
+            let pSpaceX = document.getElementById('prov_spacex').checked;
+            let pESA = document.getElementById('prov_esa').checked;
+            let pULA = document.getElementById('prov_ula').checked;
+
+            let tbody = document.getElementById('rocketTableBody');
+            tbody.innerHTML = "";
+
+            let filtered = rockets.filter(r => {
+                let provMatch = (r.provider === "ISRO" && pISRO) || 
+                                (r.provider === "SpaceX" && pSpaceX) || 
+                                (r.provider === "ESA" && pESA) || 
+                                (r.provider === "ULA" && pULA);
+                return r.cap >= mass && r.cost <= budget && provMatch;
+            });
+
+            if(filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: #ef4444; padding: 20px;">No launch vehicles meet current strict constraints. Try increasing budget or lowering payload mass.</td></tr>`;
+                return;
+            }
+
+            bestMatch = filtered[0];
+
+            filtered.forEach(r => {
+                let row = `<tr>
+                    <td><strong>${r.name}</strong></td>
+                    <td>${r.provider}</td>
+                    <td>${r.cap.toLocaleString()} kg</td>
+                    <td>$${r.cost} M</td>
+                    <td><span style="color: var(--success-color);">${r.success}</span></td>
+                    <td><span style="background: rgba(16,185,129,0.1); color: var(--success-color); padding: 2px 8px; border-radius: 4px; font-size: 0.8rem;">Recommended</span></td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+        }
+
+        function exportConfig() {
+            let modal = document.getElementById('exportModal');
+            let site = document.getElementById('launchSite').value;
+            document.getElementById('exportText').innerText = `Top Match: ${bestMatch.name} (${bestMatch.provider}) | Cost: $${bestMatch.cost}M | Launch Complex: ${site}. Summary package prepared for BSERC submission.`;
+            modal.style.display = "block";
+        }
+
+        filterRockets();
+    </script>
+</body>
+</html>
