@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Satellite Orbital Simulator | BSERC Def-Space</title>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #111827;
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border-color: #1f2937;
+            --success-color: #10b981;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); padding: 20px; line-height: 1.6; }
+        header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px; }
+        header h1 { font-size: 1.5rem; color: var(--accent-color); }
+        .badge { background: rgba(59, 130, 246, 0.1); color: var(--accent-color); padding: 4px 10px; border-radius: 4px; font-size: 0.85rem; border: 1px solid rgba(59, 130, 246, 0.2); }
+        
+        .main-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        @media (max-width: 900px) { .main-layout { grid-template-columns: 1fr; } }
+
+        .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .card h2 { font-size: 1.1rem; margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; color: var(--text-main); }
+        
+        /* Canvas Container */
+        #simCanvas { width: 100%; height: 420px; background: #030712; border-radius: 6px; border: 1px solid var(--border-color); display: block; }
+        
+        /* Controls */
+        .control-group { margin-bottom: 15px; }
+        .control-group label { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 5px; color: var(--text-muted); }
+        .control-group label span { color: var(--text-main); font-weight: bold; }
+        input[type="range"] { width: 100%; accent-color: var(--accent-color); cursor: pointer; }
+        
+        .btn-action { width: 100%; background: var(--accent-color); color: white; border: none; padding: 10px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; margin-top: 5px; }
+        .btn-action:hover { background: var(--accent-hover); }
+        .btn-action.active-toggle { background: var(--success-color); }
+
+        .checkbox-group { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+        .checkbox-group label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; }
+        .checkbox-group input { accent-color: var(--accent-color); transform: scale(1.1); cursor: pointer; }
+
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .stat-box { background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); padding: 10px; border-radius: 6px; text-align: center; }
+        .stat-box .s-label { font-size: 0.75rem; color: var(--text-muted); }
+        .stat-box .s-val { font-size: 1.1rem; font-weight: bold; color: var(--accent-color); margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>BSERC Def-Space // Orbital Dynamics Simulator</h1>
+        <div class="badge">Simulation Engine: Active</div>
+    </header>
+
+    <div class="main-layout">
+        <!-- Canvas Visualizer -->
+        <div class="card">
+            <h2>Orbital Visualizer (2D Real-Time Keplerian Model)</h2>
+            <canvas id="simCanvas" width="650" height="420"></canvas>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="s-label">Orbital Velocity</div>
+                    <div class="s-val" id="valVel">7.65 km/s</div>
+                </div>
+                <div class="stat-box">
+                    <div class="s-label">Orbital Period</div>
+                    <div class="s-val" id="valPeriod">95.4 mins</div>
+                </div>
+                <div class="stat-box">
+                    <div class="s-label">Power Generation</div>
+                    <div class="s-val" id="valPower">1,450 W</div>
+                </div>
+                <div class="stat-box">
+                    <div class="s-label">Delta-V Budget</div>
+                    <div class="s-val" id="valDv">1,200 m/s</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Physical Controls -->
+        <div class="card">
+            <h2>Physical Controls & Layers</h2>
+            
+            <!-- Control 1: Altitude Slider -->
+            <div class="control-group">
+                <label>Orbital Altitude: <span id="altVal">550 km</span></label>
+                <input type="range" id="altSlider" min="300" max="1200" value="550" oninput="updateControls()">
+            </div>
+
+            <!-- Control 2: Inclination Slider -->
+            <div class="control-group">
+                <label>Inclination Angle: <span id="incVal">45°</span></label>
+                <input type="range" id="incSlider" min="0" max="90" value="45" oninput="updateControls()">
+            </div>
+
+            <!-- Control 3: Thruster Burn Action -->
+            <div class="control-group" style="margin-top: 20px;">
+                <label>Station-Keeping Thruster Burn</label>
+                <button class="btn-action" id="burnBtn" onclick="triggerBurn()">Fire Orbit Correction Burn</button>
+            </div>
+
+            <!-- Control 4: Solar Panel Toggle -->
+            <div class="control-group" style="margin-top: 15px;">
+                <label>Solar Arrays Status</label>
+                <button class="btn-action active-toggle" id="solarBtn" onclick="toggleSolar()">Panels: DEPLOYED</button>
+            </div>
+
+            <!-- Control 5: Checkbox Overlays -->
+            <div class="control-group" style="margin-top: 15px;">
+                <label style="margin-bottom: 8px;">Map & Space Overlays</label>
+                <div class="checkbox-group">
+                    <label><input type="checkbox" id="chkGround" checked onchange="toggleLayer()"> Ground Station Coverage Ring</label>
+                    <label><input type="checkbox" id="chkDebris" checked onchange="toggleLayer()"> Orbital Debris Field</label>
+                    <label><input type="checkbox" id="chkMag" onchange="toggleLayer()"> Earth Magnetic Field Lines</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let altitude = 550;
+        let inclination = 45;
+        let solarDeployed = true;
+        let burnActive = false;
+        let burnTimer = 0;
+        let angle = 0;
+
+        let showGround = true;
+        let showDebris = true;
+        let showMag = false;
+
+        // Random debris particles
+        const debris = Array.from({length: 15}, () => ({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            r: Math.random() * 2 + 1,
+            speed: Math.random() * 0.5 + 0.2
+        }));
+
+        function updateControls() {
+            altitude = parseInt(document.getElementById('altSlider').value);
+            inclination = parseInt(document.getElementById('incSlider').value);
+            
+            document.getElementById('altVal').innerText = altitude + " km";
+            document.getElementById('incVal').innerText = inclination + "°";
+
+            let vel = (7.9 - (altitude - 300) * 0.002).toFixed(2);
+            let period = (90 + (altitude - 300) * 0.05).toFixed(1);
+            document.getElementById('valVel').innerText = vel + " km/s";
+            document.getElementById('valPeriod').innerText = period + " mins";
+        }
+
+        function triggerBurn() {
+            burnActive = true;
+            burnTimer = 40;
+            let dv = parseInt(document.getElementById('valDv').innerText);
+            document.getElementById('valDv').innerText = Math.max(0, dv - 45) + " m/s";
+            setTimeout(() => { burnActive = false; }, 2000);
+        }
+
+        function toggleSolar() {
+            solarDeployed = !solarDeployed;
+            let btn = document.getElementById('solarBtn');
+            if(solarDeployed) {
+                btn.innerText = "Panels: DEPLOYED";
+                btn.className = "btn-action active-toggle";
+                document.getElementById('valPower').innerText = "1,450 W";
+            } else {
+                btn.innerText = "Panels: RETRACTED";
+                btn.className = "btn-action";
+                document.getElementById('valPower').innerText = "120 W (Backup)";
+            }
+        }
+
+        function toggleLayer() {
+            showGround = document.getElementById('chkGround').checked;
+            showDebris = document.getElementById('chkDebris').checked;
+            showMag = document.getElementById('chkMag').checked;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let cx = canvas.width / 2;
+            let cy = canvas.height / 2;
+
+            // Draw Magnetic Field Lines if checked
+            if(showMag) {
+                ctx.strokeStyle = "rgba(59, 130, 246, 0.15)";
+                ctx.lineWidth = 1;
+                for(let r = 90; r < 180; r += 25) {
+                    ctx.beginPath();
+                    ctx.ellipse(cx, cy, r * 1.5, r, 0, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+
+            // Draw Earth
+            let earthRadius = 70;
+            let earthGrad = ctx.createRadialGradient(cx - 20, cy - 20, 10, cx, cy, earthRadius);
+            earthGrad.addColorStop(0, '#60a5fa');
+            earthGrad.addColorStop(0.5, '#1e40af');
+            earthGrad.addColorStop(1, '#0f172a');
+            
+            ctx.fillStyle = earthGrad;
+            ctx.beginPath();
+            ctx.arc(cx, cy, earthRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Ground Station Coverage Ring
+            if(showGround) {
+                ctx.strokeStyle = "rgba(16, 185, 129, 0.4)";
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.arc(cx, cy, earthRadius + 25, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // Draw Orbital Path
+            let orbitRadius = earthRadius + (altitude / 6);
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+            ctx.lineWidth = 1.5;
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate((inclination * Math.PI) / 180);
+            ctx.beginPath();
+            ctx.ellipse(0, 0, orbitRadius, orbitRadius * 0.7, 0, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Satellite Position
+            let x = orbitRadius * Math.cos(angle);
+            let y = (orbitRadius * 0.7) * Math.sin(angle);
+
+            // Draw Satellite Body
+            ctx.fillStyle = "#f3f4f6";
+            ctx.fillRect(x - 6, y - 6, 12, 12);
+
+            // Draw Solar Panels
+            if(solarDeployed) {
+                ctx.fillStyle = "#3b82f6";
+                ctx.fillRect(x - 18, y - 3, 10, 6);
+                ctx.fillRect(x + 8, y - 3, 10, 6);
+            }
+
+            // Thruster Burn Flame
+            if(burnActive || burnTimer > 0) {
+                ctx.fillStyle = "#ef4444";
+                ctx.beginPath();
+                ctx.moveTo(x - 4, y + 6);
+                ctx.lineTo(x + 4, y + 6);
+                ctx.lineTo(x, y + 16);
+                ctx.fill();
+                if(burnTimer > 0) burnTimer--;
+            }
+            ctx.restore();
+
+            // Debris Layer
+            if(showDebris) {
+                ctx.fillStyle = "rgba(239, 68, 68, 0.6)";
+                debris.forEach(d => {
+                    d.x += d.speed;
+                    if(d.x > canvas.width) d.x = 0;
+                    ctx.beginPath();
+                    ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+
+            angle += 0.015;
+            requestAnimationFrame(draw);
+        }
+
+        updateControls();
+        draw();
+    </script>
+</body>
+</html>
